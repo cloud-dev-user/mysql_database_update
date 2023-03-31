@@ -4,40 +4,41 @@ pipeline {
     stages {
         stage('Verify if table exist else create the table in MYSQL') {
             steps {
-              
-              
-                // Install MySQL client
-                sh 'sudo apt-get update'
-                sh 'sudo apt-get install -y mysql-client'
+                    sh """
+                     mysql -h <db_host> -P 3306 -u <db_user> -p <db_pass> "USE <database_name>;"
+                     if [ "$?" == "0" ]; then 
+                                echo "database created" 
+                     else 
+                                 echo "Please verify if database exists" 
+                     exit 1
+                     fi 
+                     """
+                     error "Database is not created" 
                 
-                // Create database and user
-                sh 'mysql -h <db_host> -u <db_user> -p<db_password> -e "CREATE DATABASE mydb;"'
-                sh 'mysql -h <db_host> -u <db_user> -p<db_password> -e "CREATE USER \'myuser\'@\'%\' IDENTIFIED BY \'mypassword\';"'
-                sh 'mysql -h <db_host> -u <db_user> -p<db_password> -e "GRANT ALL PRIVILEGES ON mydb.* TO \'myuser\'@\'%\';"'
             }
         }
         
-        stage('Update database') {
+        stage('Create  table and insert data') {
             steps {
-                // Run SQL script to create new table
-                withCredentials([string(credentialsId: 'mysql_password', variable: 'MYSQL_PASSWORD')]) {
-                    sh 'mysql -h <db_host> -u myuser -p"$MYSQL_PASSWORD" mydb < create_table.sql'
+                     sh """
+                         ./verify_table_exists.py 
+                        if [ "$?" == "0" ]; then 
+                                echo "table is present and we can go to update table stage" 
+                        else 
+                               echo "table doesn't exists and we will create the table & inset sample data" 
+                                ./mysql_create_table.py && mysql_insert_data.py 
+                        fi
+                      """
                 }
-                
-                // Insert sample data into new table
-                withCredentials([string(credentialsId: 'mysql_password', variable: 'MYSQL_PASSWORD')]) {
-                    sh 'mysql -h <db_host> -u myuser -p"$MYSQL_PASSWORD" mydb < insert_data.sql'
+            }
+         stage('Update table') {
+            steps {
+                     sh """
+                      ./mysql_update.py
+                      """
                 }
             }
         }
-        
-        stage('Rollback changes') {
-            steps {
-                // Rollback changes using SQL script
-                withCredentials([string(credentialsId: 'mysql_password', variable: 'MYSQL_PASSWORD')]) {
-                    sh 'mysql -h <db_host> -u myuser -p"$MYSQL_PASSWORD" mydb < rollback.sql'
-                }
-            }
         }
     }
 }
