@@ -1,4 +1,9 @@
+import os 
 import mysql.connector
+
+username = os.environ.get('mysql_user')
+password = os.environ.get('mysql_pass')
+databse_name = os.environ.get('mysql_db')
 
 # Establish database connection
 cnx = mysql.connector.connect(user='username', password='password', host='localhost', database='database_name')
